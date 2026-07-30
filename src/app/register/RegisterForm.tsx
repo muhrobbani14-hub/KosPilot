@@ -29,6 +29,24 @@ const registerRoles = [
   icon: typeof ShieldCheck;
 }>;
 
+async function waitForBrowserSession(supabase: ReturnType<typeof createClient>) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const {
+      data: { session }
+    } = await supabase.auth.getSession();
+
+    if (session) {
+      return true;
+    }
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 120);
+    });
+  }
+
+  return false;
+}
+
 export function RegisterForm() {
   const [role, setRole] = useState<RegisterRole>("owner");
   const [fullName, setFullName] = useState("");
@@ -109,6 +127,12 @@ export function RegisterForm() {
         setMessage(
           "Akun berhasil dibuat. Cek email untuk verifikasi, lalu login."
         );
+        return;
+      }
+
+      const hasSession = await waitForBrowserSession(supabase);
+      if (!hasSession) {
+        setMessage("Akun berhasil dibuat. Login ulang untuk masuk aplikasi.");
         return;
       }
 

@@ -8,14 +8,14 @@ import {
 } from "@/lib/tenant-data";
 
 export default async function TenantBillsPage() {
-  const { profile, bills } = await getTenantPortalData();
+  const { profile, bills, sourceReason } = await getTenantPortalData();
   const unpaidTotal = bills
     .filter((bill) => bill.status !== "paid")
     .reduce((total, bill) => total + bill.amount, 0);
   const paidCount = bills.filter((bill) => bill.status === "paid").length;
 
   return (
-    <TenantShell profile={profile}>
+    <TenantShell profile={profile} sourceReason={sourceReason}>
       <section className="grid gap-4 md:grid-cols-3">
         <TenantCard
           label="Belum selesai"

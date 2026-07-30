@@ -21,6 +21,7 @@ type TenantPaymentsManagerProps = {
   profile: TenantPortalProfile;
   bills: TenantPortalBill[];
   payments: TenantPortalPayment[];
+  sourceReason?: string;
 };
 
 function getInitialFormValues(bills: TenantPortalBill[]): TenantPaymentFormValues {
@@ -54,7 +55,8 @@ function tenantPaymentRowsFromData(payments: TenantPortalPayment[]) {
 export function TenantPaymentsManager({
   profile,
   bills,
-  payments
+  payments,
+  sourceReason
 }: TenantPaymentsManagerProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -136,7 +138,7 @@ export function TenantPaymentsManager({
   }
 
   return (
-    <TenantShell profile={profile}>
+    <TenantShell profile={profile} sourceReason={sourceReason}>
       <section className="grid gap-4 md:grid-cols-3">
         <TenantCard
           label="Total dibayar"

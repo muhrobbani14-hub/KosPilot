@@ -13,9 +13,14 @@ import type { TenantPortalProfile } from "@/lib/tenant-data";
 type TenantShellProps = {
   children: ReactNode;
   profile: TenantPortalProfile;
+  sourceReason?: string;
 };
 
-export function TenantShell({ children, profile }: TenantShellProps) {
+export function TenantShell({
+  children,
+  profile,
+  sourceReason
+}: TenantShellProps) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -85,7 +90,10 @@ export function TenantShell({ children, profile }: TenantShellProps) {
           </aside>
 
           <section className="min-w-0">
-            <TenantSessionSync shouldSync={profile.room === "-"} />
+            <TenantSessionSync
+              shouldSync={profile.room === "-"}
+              sourceReason={sourceReason}
+            />
             {children}
           </section>
         </div>

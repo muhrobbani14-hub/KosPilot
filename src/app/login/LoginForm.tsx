@@ -48,6 +48,24 @@ function isAllowedNextPath(nextPath: string | null, role: LoginRole) {
   return !nextPath.startsWith("/tenant");
 }
 
+async function waitForBrowserSession(supabase: ReturnType<typeof createClient>) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const {
+      data: { session }
+    } = await supabase.auth.getSession();
+
+    if (session) {
+      return true;
+    }
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 120);
+    });
+  }
+
+  return false;
+}
+
 export function LoginForm() {
   const searchParams = useSearchParams();
   const [selectedRole, setSelectedRole] = useState<LoginRole>("owner");
@@ -84,6 +102,12 @@ export function LoginForm() {
 
       if (loginError) {
         setError(loginError.message);
+        return;
+      }
+
+      const hasSession = await waitForBrowserSession(supabase);
+      if (!hasSession) {
+        setError("Session login belum tersimpan. Coba login ulang.");
         return;
       }
 

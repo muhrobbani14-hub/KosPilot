@@ -3,7 +3,7 @@ import { TenantShell } from "@/components/tenant/TenantShell";
 import { getTenantPortalData } from "@/lib/tenant-data";
 
 export default async function TenantProfilePage() {
-  const { profile } = await getTenantPortalData();
+  const { profile, sourceReason } = await getTenantPortalData();
   const profileRows = [
     ["Nama lengkap", profile.name],
     ["Email", profile.email],
@@ -15,7 +15,7 @@ export default async function TenantProfilePage() {
   ];
 
   return (
-    <TenantShell profile={profile}>
+    <TenantShell profile={profile} sourceReason={sourceReason}>
       <section className="grid gap-4 md:grid-cols-3">
         <TenantCard label="Kamar" note="Kamar aktif" value={profile.room} />
         <TenantCard

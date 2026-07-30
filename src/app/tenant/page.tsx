@@ -11,7 +11,7 @@ import {
 } from "@/lib/tenant-data";
 
 export default async function TenantHomePage() {
-  const { profile, bills, reports } = await getTenantPortalData();
+  const { profile, bills, reports, sourceReason } = await getTenantPortalData();
   const activeBill =
     bills.find((bill) => bill.status !== "paid") ?? bills[0] ?? null;
   const heroText = activeBill
@@ -19,7 +19,7 @@ export default async function TenantHomePage() {
     : "Belum ada tagihan aktif untuk kamar ini.";
 
   return (
-    <TenantShell profile={profile}>
+    <TenantShell profile={profile} sourceReason={sourceReason}>
       <section className="rounded-[32px] bg-[#20352f] p-5 text-white shadow-xl md:p-6">
         <p className="text-sm font-bold text-[#d9f99d]">
           Selamat datang, {profile.name}

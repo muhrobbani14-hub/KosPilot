@@ -18,6 +18,7 @@ import type {
 type TenantReportsManagerProps = {
   profile: TenantPortalProfile;
   reports: TenantPortalReport[];
+  sourceReason?: string;
 };
 
 const emptyFormValues: TenantReportFormValues = {
@@ -52,7 +53,8 @@ function tenantReportRowsFromData(reports: TenantPortalReport[]) {
 
 export function TenantReportsManager({
   profile,
-  reports
+  reports,
+  sourceReason
 }: TenantReportsManagerProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -127,7 +129,7 @@ export function TenantReportsManager({
   }
 
   return (
-    <TenantShell profile={profile}>
+    <TenantShell profile={profile} sourceReason={sourceReason}>
       <section className="grid gap-4 md:grid-cols-3">
         <TenantCard
           label="Laporan aktif"
