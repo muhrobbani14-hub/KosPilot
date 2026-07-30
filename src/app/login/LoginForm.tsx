@@ -36,6 +36,18 @@ function fallbackRoute(role: LoginRole) {
   return role === "owner" ? "/dashboard" : "/tenant";
 }
 
+function isAllowedNextPath(nextPath: string | null, role: LoginRole) {
+  if (!nextPath?.startsWith("/")) {
+    return false;
+  }
+
+  if (role === "tenant") {
+    return nextPath === "/tenant" || nextPath.startsWith("/tenant/");
+  }
+
+  return !nextPath.startsWith("/tenant");
+}
+
 export function LoginForm() {
   const searchParams = useSearchParams();
   const [selectedRole, setSelectedRole] = useState<LoginRole>("owner");
@@ -86,13 +98,27 @@ export function LoginForm() {
             .eq("id", user.id)
             .maybeSingle()
         : { data: null };
+      const { data: tenant } =
+        user && profile?.role !== "owner"
+          ? await supabase
+              .from("tenants")
+              .select("id")
+              .or(`profile_id.eq.${user.id},email.eq.${user.email}`)
+              .limit(1)
+              .maybeSingle()
+          : { data: null };
 
       const role =
         profile?.role === "tenant" || profile?.role === "owner"
           ? profile.role
+          : tenant
+            ? "tenant"
           : selectedRole;
       const nextPath = searchParams.get("next");
-      const targetPath = nextPath || fallbackRoute(role);
+      const targetPath =
+        nextPath && isAllowedNextPath(nextPath, role)
+          ? nextPath
+          : fallbackRoute(role);
 
       setMessage("Login berhasil. Mengalihkan halaman...");
       sessionStorage.removeItem("kospilot-tenant-session-sync");
