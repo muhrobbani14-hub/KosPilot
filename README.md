@@ -23,8 +23,8 @@ Buka `http://localhost:3000`.
 
 ## Supabase
 
-1. Jalankan `docs/supabase-schema.sql`.
-2. Jalankan policy SQL sesuai modul di folder `docs`.
+1. Jalankan `docs/deploy-supabase.sql` di Supabase SQL Editor.
+2. Pastikan bucket Storage `payment-proofs`, `expense-proofs`, dan `report-photos` sudah ada.
 3. Isi `.env.local` dari `.env.example`.
 4. Pastikan user Auth punya row `profiles` dengan role `owner` atau `tenant`.
 

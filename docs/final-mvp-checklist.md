@@ -16,8 +16,8 @@ Status saat ini: MVP Supabase dengan dashboard pemilik dan portal penghuni.
 
 ## Wajib Dicek Sebelum Deploy
 
-- Semua file policy SQL terbaru sudah dijalankan di Supabase SQL Editor.
-- Bucket Storage `payment-proofs`, `expense-proofs`, dan `maintenance-photos` sudah dibuat.
+- `docs/deploy-supabase.sql` sudah dijalankan di Supabase SQL Editor.
+- Bucket Storage `payment-proofs`, `expense-proofs`, dan `report-photos` sudah dibuat.
 - `.env.local` atau env deploy berisi `NEXT_PUBLIC_SUPABASE_URL` dan `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 - Akun owner dan tenant punya row `profiles` sesuai ID Supabase Auth.
 - Tenant aktif terhubung ke `profile_id` atau email Auth yang sama.
