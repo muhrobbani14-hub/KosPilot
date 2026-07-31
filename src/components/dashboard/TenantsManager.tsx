@@ -21,7 +21,11 @@ import {
 } from "@/app/tenants/actions";
 import type { TenantFormValues } from "@/app/tenants/actions";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import type { OwnerRoomRecord, OwnerTenantRecord } from "@/lib/owner-data";
+import type {
+  OwnerRoomRecord,
+  OwnerTenantCandidateRecord,
+  OwnerTenantRecord
+} from "@/lib/owner-data";
 
 type Metric = {
   label: string;
@@ -32,6 +36,7 @@ type Metric = {
 
 type TenantsManagerProps = {
   metrics: Metric[];
+  tenantCandidates: OwnerTenantCandidateRecord[];
   tenants: OwnerTenantRecord[];
   rooms: OwnerRoomRecord[];
 };
@@ -84,6 +89,7 @@ function tenantToFormValues(tenant: OwnerTenantRecord): TenantFormValues {
 
 export function TenantsManager({
   metrics,
+  tenantCandidates,
   tenants,
   rooms
 }: TenantsManagerProps) {
@@ -245,6 +251,45 @@ export function TenantsManager({
           </label>
         </div>
 
+        {tenantCandidates.length ? (
+          <div className="mt-5 rounded-[28px] border border-amber-100 bg-amber-50/70 p-4">
+            <div>
+              <p className="text-sm font-black text-amber-900">
+                Menunggu pilih kamar
+              </p>
+              <p className="mt-1 text-sm leading-6 text-amber-800">
+                Akun berikut sudah daftar sebagai penghuni dan akan aktif
+                setelah memilih kamar kosong dari portal tenant.
+              </p>
+            </div>
+            <div className="mt-4 grid gap-3 lg:grid-cols-2">
+              {tenantCandidates.map((candidate) => (
+                <article
+                  className="min-w-0 rounded-3xl border border-amber-100 bg-white p-4 shadow-sm"
+                  key={candidate.id}
+                >
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
+                      <ShieldCheck size={20} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="break-words font-black text-slate-950">
+                        {candidate.full_name || candidate.email}
+                      </p>
+                      <p className="mt-1 break-words text-sm text-slate-500">
+                        {candidate.email}
+                      </p>
+                      <span className="mt-3 inline-flex rounded-full bg-amber-100 px-3 py-1.5 text-xs font-black text-amber-800">
+                        Belum pilih kamar
+                      </span>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         {tenants.length ? (
           <div className="mt-5 space-y-3">
             {tenants.map((tenant) => (
@@ -298,7 +343,7 @@ export function TenantsManager({
               </article>
             ))}
           </div>
-        ) : (
+        ) : tenantCandidates.length ? null : (
           <div className="mt-5 rounded-[28px] border border-dashed border-slate-200 bg-white p-8 text-center">
             <AlertTriangle className="mx-auto text-[#2a6b5c]" size={30} />
             <h3 className="mt-3 text-xl font-black text-slate-950">

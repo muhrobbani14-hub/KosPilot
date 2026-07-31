@@ -41,7 +41,8 @@ export function TenantShell({
             <div className="min-w-0">
               <p className="text-lg font-black text-slate-950">KosPilot</p>
               <p className="text-sm font-semibold text-[#2a6b5c]">
-                Portal penghuni - Kamar {profile.room}
+                Portal penghuni -{" "}
+                {profile.room === "-" ? "Pilih kamar" : `Kamar ${profile.room}`}
               </p>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import { formatMoney } from "@/lib/dashboard";
+import { compareNaturalText, formatMoney } from "@/lib/dashboard";
 import { hasSupabaseConfig } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,6 +13,15 @@ export type TenantPortalProfile = {
   moveInDate: string;
   emergencyContact: string;
   status: string;
+};
+
+export type TenantAvailableRoom = {
+  id: string;
+  propertyId: string;
+  name: string;
+  floor: string | null;
+  monthlyPrice: number;
+  yearlyPrice: number | null;
 };
 
 export type TenantPortalBill = {
@@ -50,6 +59,7 @@ export type TenantPortalData = {
   source: "supabase";
   sourceReason?: string;
   profile: TenantPortalProfile;
+  availableRooms: TenantAvailableRoom[];
   bills: TenantPortalBill[];
   payments: TenantPortalPayment[];
   reports: TenantPortalReport[];
@@ -149,10 +159,37 @@ function emptySupabaseTenantPortalData({
       emergencyContact: "-",
       status: "Belum terhubung"
     },
+    availableRooms: [],
     bills: [],
     payments: [],
     reports: []
   };
+}
+
+async function getAvailableRoomsForTenantPortal(
+  supabase: Awaited<ReturnType<typeof createClient>>
+) {
+  const { data, error } = await supabase
+    .from("rooms")
+    .select("id,property_id,name,floor,monthly_price,yearly_price")
+    .eq("status", "vacant");
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? [])
+    .map((room) => ({
+      id: room.id,
+      propertyId: room.property_id,
+      name: room.name,
+      floor: room.floor,
+      monthlyPrice: room.monthly_price,
+      yearlyPrice: room.yearly_price
+    }))
+    .sort((firstRoom, secondRoom) =>
+      compareNaturalText(firstRoom.name, secondRoom.name)
+    ) as TenantAvailableRoom[];
 }
 
 function getRoomName(tenant: TenantRecord) {
@@ -264,13 +301,34 @@ export async function getTenantPortalData(): Promise<TenantPortalData> {
     }
 
     if (!tenant) {
-      return emptySupabaseTenantPortalData({
-        email: userEmail,
-        name: userName,
-        sourceReason: `tenant tidak ditemukan untuk session=${
-          user.email ?? "tidak ada"
-        }`
-      });
+      let availableRooms: TenantAvailableRoom[] = [];
+
+      try {
+        availableRooms = await getAvailableRoomsForTenantPortal(supabase);
+      } catch (roomError) {
+        return {
+          ...emptySupabaseTenantPortalData({
+            email: userEmail,
+            name: userName,
+            sourceReason:
+              roomError instanceof Error
+                ? `tenant belum memilih kamar; ${roomError.message}`
+                : "tenant belum memilih kamar; kamar kosong belum bisa dibaca"
+          }),
+          availableRooms
+        };
+      }
+
+      return {
+        ...emptySupabaseTenantPortalData({
+          email: userEmail,
+          name: userName,
+          sourceReason: `tenant belum memilih kamar untuk session=${
+            user.email ?? "tidak ada"
+          }`
+        }),
+        availableRooms
+      };
     }
 
     const tenantRecord = tenant as unknown as TenantRecord;
@@ -306,6 +364,7 @@ export async function getTenantPortalData(): Promise<TenantPortalData> {
           user.email ?? "tidak ada"
         }`,
         profile: tenantToProfile(tenantRecord),
+        availableRooms: [],
         bills: [],
         payments: [],
         reports: []
@@ -346,6 +405,7 @@ export async function getTenantPortalData(): Promise<TenantPortalData> {
     return {
       source: "supabase",
       profile: tenantToProfile(tenantRecord),
+      availableRooms: [],
       bills,
       payments,
       reports

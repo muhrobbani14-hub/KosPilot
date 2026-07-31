@@ -1,8 +1,10 @@
 "use client";
 
-import { UploadCloud } from "lucide-react";
+/* eslint-disable @next/next/no-img-element -- Payment proof previews use local blob URLs. */
+
+import { FileText, UploadCloud } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import { uploadTenantPaymentProofAction } from "@/app/tenant/payments/actions";
 import type { TenantPaymentFormValues } from "@/app/tenant/payments/actions";
@@ -52,6 +54,10 @@ function tenantPaymentRowsFromData(payments: TenantPortalPayment[]) {
   }));
 }
 
+function isImageFile(file: File) {
+  return file.type.startsWith("image/");
+}
+
 export function TenantPaymentsManager({
   profile,
   bills,
@@ -64,6 +70,8 @@ export function TenantPaymentsManager({
     getInitialFormValues(bills)
   );
   const [fileName, setFileName] = useState("");
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [previewType, setPreviewType] = useState<"image" | "file" | "">("");
   const [isUploading, setIsUploading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -73,6 +81,14 @@ export function TenantPaymentsManager({
   const pendingCount = payments.filter(
     (payment) => payment.status === "pending"
   ).length;
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
 
   function selectBill(billId: string) {
     const bill = bills.find((item) => item.id === billId);
@@ -98,6 +114,11 @@ export function TenantPaymentsManager({
 
       setMessage(result.message);
       setFileName("");
+      setPreviewType("");
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        setPreviewUrl("");
+      }
       setFormValues(getInitialFormValues(bills));
       router.refresh();
     });
@@ -111,6 +132,18 @@ export function TenantPaymentsManager({
     setError("");
     setMessage("");
     setIsUploading(true);
+    const nextPreviewUrl = isImageFile(file) ? URL.createObjectURL(file) : "";
+
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl("");
+    }
+
+    setFileName(file.name);
+    setPreviewType(isImageFile(file) ? "image" : "file");
+    if (nextPreviewUrl) {
+      setPreviewUrl(nextPreviewUrl);
+    }
 
     try {
       const path = await uploadAppFile({
@@ -120,7 +153,6 @@ export function TenantPaymentsManager({
         allowedTypes: proofFileTypes
       });
 
-      setFileName(file.name);
       setFormValues((currentValues) => ({
         ...currentValues,
         proofPath: path
@@ -132,6 +164,12 @@ export function TenantPaymentsManager({
           ? uploadError.message
           : "Gagal upload file bukti."
       );
+      setFileName("");
+      setPreviewType("");
+      if (nextPreviewUrl) {
+        URL.revokeObjectURL(nextPreviewUrl);
+        setPreviewUrl("");
+      }
     } finally {
       setIsUploading(false);
     }
@@ -227,6 +265,35 @@ export function TenantPaymentsManager({
                 type="file"
               />
             </label>
+
+            {fileName ? (
+              <div className="rounded-[28px] border border-slate-100 bg-white p-4">
+                <p className="text-sm font-black text-slate-950">
+                  Preview bukti
+                </p>
+                {previewType === "image" && previewUrl ? (
+                  <img
+                    alt={`Preview bukti pembayaran ${fileName}`}
+                    className="mt-3 max-h-72 w-full rounded-2xl border border-slate-100 object-contain"
+                    src={previewUrl}
+                  />
+                ) : (
+                  <div className="mt-3 flex min-w-0 items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                    <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-white text-[#2a6b5c]">
+                      <FileText size={22} />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="break-words text-sm font-black text-slate-950">
+                        {fileName}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        File siap dikirim sebagai bukti pembayaran.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
 
           {error ? (

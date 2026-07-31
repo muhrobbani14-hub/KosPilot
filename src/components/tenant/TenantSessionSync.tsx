@@ -22,6 +22,10 @@ function getTenantPortalMessage(sourceReason?: string) {
     return "";
   }
 
+  if (sourceReason.includes("tenant belum memilih kamar untuk session")) {
+    return "";
+  }
+
   if (sourceReason.includes("tenant tidak ditemukan")) {
     return "Akun ini belum terhubung ke data penghuni. Pastikan email akun sama dengan data penghuni yang dibuat pemilik kos, atau minta pemilik menghubungkan akun ini.";
   }

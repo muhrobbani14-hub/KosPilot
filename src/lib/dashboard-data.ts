@@ -81,6 +81,16 @@ type ActivityLogRow = {
   created_at: string;
 };
 
+type PaymentAmountRow = {
+  amount: number;
+  paid_at: string;
+};
+
+type ExpenseAmountRow = {
+  amount: number;
+  expense_date: string;
+};
+
 type ProfileRow = {
   full_name: string | null;
 };
@@ -166,6 +176,13 @@ function getRepairAge(createdAt: string) {
   return `${Math.round(diffHours / 24)} hari lalu`;
 }
 
+function getMonthKey(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+
+  return `${year}-${month}`;
+}
+
 function getRoomStatus(room: RoomRow, hasPendingBill: boolean) {
   if (room.status === "maintenance") {
     return "Perbaikan";
@@ -193,12 +210,7 @@ export async function getDashboardOverviewData(): Promise<DashboardOverviewData>
       data: { user }
     } = await supabase.auth.getUser();
     const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-      .toISOString()
-      .slice(0, 10);
-    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-      .toISOString()
-      .slice(0, 10);
+    const currentMonthKey = getMonthKey(now);
     const [
       { data: profileData },
       { data: propertyData },
@@ -238,15 +250,11 @@ export async function getDashboardOverviewData(): Promise<DashboardOverviewData>
         .limit(5),
       supabase
         .from("payments")
-        .select("amount")
-        .eq("verification_status", "approved")
-        .gte("paid_at", `${monthStart}T00:00:00`)
-        .lt("paid_at", `${nextMonthStart}T00:00:00`),
+        .select("amount,paid_at")
+        .eq("verification_status", "approved"),
       supabase
         .from("expenses")
-        .select("amount")
-        .gte("expense_date", monthStart)
-        .lt("expense_date", nextMonthStart),
+        .select("amount,expense_date"),
       supabase
         .from("maintenance_reports")
         .select("title,status,created_at,rooms(name)")
@@ -321,14 +329,24 @@ export async function getDashboardOverviewData(): Promise<DashboardOverviewData>
       status: repair.status === "new" ? "Baru" : "Diproses",
       age: getRepairAge(repair.created_at)
     }));
-    const income = (paymentsData ?? []).reduce(
-      (total, payment) => total + payment.amount,
-      0
-    );
-    const expenses = (expensesData ?? []).reduce(
-      (total, expense) => total + expense.amount,
-      0
-    );
+    const paymentRows = (paymentsData ?? []) as PaymentAmountRow[];
+    const expenseRows = (expensesData ?? []) as ExpenseAmountRow[];
+    const income = paymentRows
+      .filter((payment) => payment.paid_at.slice(0, 7) === currentMonthKey)
+      .reduce(
+        (total, payment) => total + payment.amount,
+        0
+      );
+    const expenses = expenseRows
+      .filter((expense) => expense.expense_date.slice(0, 7) === currentMonthKey)
+      .reduce(
+        (total, expense) => total + expense.amount,
+        0
+      );
+    const summary = {
+      ...getSummary(rooms),
+      monthlyIncome: income
+    };
     const generatedActivities = [
       billRows.some((bill) => bill.status === "pending_verification")
         ? "Ada bukti pembayaran yang menunggu verifikasi."
@@ -352,7 +370,7 @@ export async function getDashboardOverviewData(): Promise<DashboardOverviewData>
       activities: activities.length
         ? activities
         : ["Belum ada aktivitas prioritas."],
-      summary: getSummary(rooms),
+      summary,
       cashflow: {
         income,
         expenses,

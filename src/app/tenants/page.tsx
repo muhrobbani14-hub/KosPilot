@@ -3,7 +3,7 @@ import { getOwnerRoomsData, getOwnerTenantsData } from "@/lib/owner-data";
 
 export default async function TenantsPage() {
   const [
-    { metrics, tenants },
+    { metrics, tenants, tenantCandidates },
     { rooms }
   ] = await Promise.all([getOwnerTenantsData(), getOwnerRoomsData()]);
 
@@ -11,6 +11,7 @@ export default async function TenantsPage() {
     <TenantsManager
       metrics={metrics}
       rooms={rooms ?? []}
+      tenantCandidates={tenantCandidates ?? []}
       tenants={tenants ?? []}
     />
   );

@@ -1,8 +1,13 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element -- Payment proof previews use blob and private signed URLs. */
+
 import {
   AlertTriangle,
   CheckCircle2,
+  ExternalLink,
+  Eye,
+  FileText,
   Pencil,
   Plus,
   Search,
@@ -11,7 +16,7 @@ import {
   X
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import {
   createPaymentAction,
@@ -73,6 +78,14 @@ const paymentStatusClasses: Record<
   rejected: "bg-rose-50 text-rose-700"
 };
 
+type ProofPreview = {
+  kind: "image" | "file";
+  label: string;
+  title: string;
+  url: string;
+  isLocal?: boolean;
+};
+
 function getPaymentBill(payment: OwnerPaymentRecord) {
   if (Array.isArray(payment.bills)) {
     return payment.bills[0] ?? null;
@@ -117,6 +130,29 @@ function getPaymentRoomName(payment: OwnerPaymentRecord) {
   return bill?.rooms?.name ?? "-";
 }
 
+function getProofFileName(proofPath: string | null) {
+  return proofPath?.split("/").pop() ?? "Bukti pembayaran";
+}
+
+function isImageProof(proofPath: string | null) {
+  return /\.(jpe?g|png|webp|gif)$/i.test(proofPath ?? "");
+}
+
+function proofPreviewFromPayment(
+  payment: OwnerPaymentRecord
+): ProofPreview | null {
+  if (!payment.proof_path) {
+    return null;
+  }
+
+  return {
+    kind: isImageProof(payment.proof_path) ? "image" : "file",
+    label: getProofFileName(payment.proof_path),
+    title: `Bukti pembayaran ${getPaymentTenantName(payment)}`,
+    url: payment.proof_url ?? ""
+  };
+}
+
 function paymentToFormValues(payment: OwnerPaymentRecord): PaymentFormValues {
   return {
     id: payment.id,
@@ -157,22 +193,37 @@ export function PaymentsManager({
   const [editingPayment, setEditingPayment] =
     useState<OwnerPaymentRecord | null>(null);
   const [proofFileName, setProofFileName] = useState("");
+  const [formProofPreview, setFormProofPreview] =
+    useState<ProofPreview | null>(null);
+  const [proofPreview, setProofPreview] = useState<ProofPreview | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    return () => {
+      if (formProofPreview?.isLocal && formProofPreview.url) {
+        URL.revokeObjectURL(formProofPreview.url);
+      }
+    };
+  }, [formProofPreview]);
 
   function openCreateForm() {
     setEditingPayment(null);
     setFormValues(getInitialFormValues(bills));
     setProofFileName("");
+    setFormProofPreview(null);
     setError("");
     setIsFormOpen(true);
   }
 
   function openEditForm(payment: OwnerPaymentRecord) {
+    const preview = proofPreviewFromPayment(payment);
+
     setEditingPayment(payment);
     setFormValues(paymentToFormValues(payment));
-    setProofFileName(payment.proof_path ?? "");
+    setProofFileName(preview?.label ?? "");
+    setFormProofPreview(preview);
     setError("");
     setIsFormOpen(true);
   }
@@ -181,6 +232,7 @@ export function PaymentsManager({
     setEditingPayment(null);
     setFormValues(emptyFormValues);
     setProofFileName("");
+    setFormProofPreview(null);
     setError("");
     setIsFormOpen(false);
   }
@@ -240,6 +292,18 @@ export function PaymentsManager({
     setError("");
     setMessage("");
     setIsUploading(true);
+    const nextPreviewUrl = file.type.startsWith("image/")
+      ? URL.createObjectURL(file)
+      : "";
+
+    setProofFileName(file.name);
+    setFormProofPreview({
+      kind: file.type.startsWith("image/") ? "image" : "file",
+      label: file.name,
+      title: "Preview bukti pembayaran",
+      url: nextPreviewUrl,
+      isLocal: Boolean(nextPreviewUrl)
+    });
 
     try {
       const path = await uploadAppFile({
@@ -249,7 +313,6 @@ export function PaymentsManager({
         allowedTypes: proofFileTypes
       });
 
-      setProofFileName(file.name);
       setFormValues((currentValues) => ({
         ...currentValues,
         proofPath: path
@@ -261,6 +324,11 @@ export function PaymentsManager({
           ? uploadError.message
           : "Gagal upload bukti pembayaran."
       );
+      setProofFileName("");
+      setFormProofPreview(null);
+      if (nextPreviewUrl) {
+        URL.revokeObjectURL(nextPreviewUrl);
+      }
     } finally {
       setIsUploading(false);
     }
@@ -353,10 +421,11 @@ export function PaymentsManager({
           <div className="mt-5 space-y-3">
             {payments.map((payment) => {
               const bill = getPaymentBill(payment);
+              const preview = proofPreviewFromPayment(payment);
 
               return (
                 <article
-                  className="grid min-w-0 gap-3 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm md:grid-cols-[minmax(0,1fr)_auto_auto_auto]"
+                  className="grid min-w-0 gap-3 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm md:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto]"
                   key={payment.id}
                 >
                   <div className="flex min-w-0 items-start gap-3">
@@ -374,6 +443,28 @@ export function PaymentsManager({
                       </p>
                     </div>
                   </div>
+                  {preview ? (
+                    <button
+                      className="inline-flex min-w-0 items-center gap-2 justify-self-start rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 transition hover:border-[#2a6b5c]/40 hover:text-[#2a6b5c] md:self-center"
+                      onClick={() => setProofPreview(preview)}
+                      type="button"
+                    >
+                      {preview.kind === "image" && preview.url ? (
+                        <img
+                          alt=""
+                          className="size-8 rounded-xl object-cover"
+                          src={preview.url}
+                        />
+                      ) : (
+                        <FileText className="shrink-0" size={16} />
+                      )}
+                      <span className="max-w-28 truncate">Lihat bukti</span>
+                    </button>
+                  ) : (
+                    <span className="inline-flex justify-self-start rounded-2xl bg-slate-50 px-3 py-2 text-xs font-black text-slate-400 md:self-center">
+                      Tanpa bukti
+                    </span>
+                  )}
                   <p className="self-center whitespace-nowrap font-black text-slate-950">
                     {formatMoney(payment.amount)}
                   </p>
@@ -420,6 +511,74 @@ export function PaymentsManager({
           </div>
         )}
       </section>
+
+      {proofPreview ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4">
+          <section className="max-h-[calc(100vh-32px)] w-full max-w-4xl overflow-y-auto rounded-[28px] border border-white/70 bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-[#2a6b5c]">
+                  Preview bukti pembayaran
+                </p>
+                <h2 className="mt-1 break-words text-2xl font-black text-slate-950">
+                  {proofPreview.title}
+                </h2>
+                <p className="mt-1 break-words text-sm text-slate-500">
+                  {proofPreview.label}
+                </p>
+              </div>
+              <button
+                aria-label="Tutup preview bukti pembayaran"
+                className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
+                onClick={() => setProofPreview(null)}
+                type="button"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="mt-5 overflow-hidden rounded-[24px] border border-slate-100 bg-slate-50">
+              {proofPreview.kind === "image" && proofPreview.url ? (
+                <img
+                  alt={proofPreview.title}
+                  className="max-h-[70vh] w-full object-contain"
+                  src={proofPreview.url}
+                />
+              ) : proofPreview.url ? (
+                <iframe
+                  className="h-[70vh] w-full bg-white"
+                  src={proofPreview.url}
+                  title={proofPreview.title}
+                />
+              ) : (
+                <div className="p-8 text-center">
+                  <FileText className="mx-auto text-[#2a6b5c]" size={36} />
+                  <h3 className="mt-3 text-xl font-black text-slate-950">
+                    Preview belum tersedia
+                  </h3>
+                  <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+                    File tersimpan, tetapi aplikasi belum bisa membuat tautan
+                    preview. Periksa policy Storage untuk bucket
+                    payment-proofs.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {proofPreview.url ? (
+              <a
+                className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-700 transition hover:border-[#2a6b5c]/40 hover:text-[#2a6b5c]"
+                href={proofPreview.url}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Buka di tab baru
+                <ExternalLink size={16} />
+              </a>
+            ) : null}
+          </section>
+        </div>
+      ) : null}
 
       {isFormOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
@@ -551,6 +710,58 @@ export function PaymentsManager({
                   type="file"
                 />
               </label>
+              {formProofPreview ? (
+                <div className="rounded-[28px] border border-slate-100 bg-white p-4 sm:col-span-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-black text-slate-950">
+                      Preview bukti
+                    </p>
+                    {formProofPreview.url ? (
+                      <button
+                        className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-600 transition hover:border-[#2a6b5c]/40 hover:text-[#2a6b5c]"
+                        onClick={() => setProofPreview(formProofPreview)}
+                        type="button"
+                      >
+                        <Eye size={15} />
+                        Lihat besar
+                      </button>
+                    ) : null}
+                  </div>
+                  {formProofPreview.kind === "image" && formProofPreview.url ? (
+                    <img
+                      alt={`Preview ${formProofPreview.label}`}
+                      className="mt-3 max-h-80 w-full rounded-2xl border border-slate-100 object-contain"
+                      src={formProofPreview.url}
+                    />
+                  ) : (
+                    <div className="mt-3 flex min-w-0 items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                      <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-white text-[#2a6b5c]">
+                        <FileText size={22} />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="break-words text-sm font-black text-slate-950">
+                          {formProofPreview.label}
+                        </p>
+                        {formProofPreview.url ? (
+                          <a
+                            className="mt-1 inline-flex items-center gap-1 text-xs font-black text-[#2a6b5c]"
+                            href={formProofPreview.url}
+                            rel="noreferrer"
+                            target="_blank"
+                          >
+                            Buka file
+                            <ExternalLink size={12} />
+                          </a>
+                        ) : (
+                          <p className="mt-1 text-xs text-slate-500">
+                            File tersimpan, tetapi preview belum tersedia.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
               <label className="block sm:col-span-2">
                 <span className="text-sm font-bold text-slate-700">
                   Catatan

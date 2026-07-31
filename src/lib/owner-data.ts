@@ -28,6 +28,7 @@ type OwnerModuleData = {
   payments?: OwnerPaymentRecord[];
   expenses?: OwnerExpenseRecord[];
   maintenanceReports?: OwnerMaintenanceReportRecord[];
+  tenantCandidates?: OwnerTenantCandidateRecord[];
 };
 
 export type OwnerRoomRecord = {
@@ -42,6 +43,7 @@ export type OwnerRoomRecord = {
 
 export type OwnerTenantRecord = {
   id: string;
+  profile_id?: string | null;
   property_id: string;
   room_id: string;
   full_name: string;
@@ -59,6 +61,14 @@ export type OwnerTenantRecord = {
         name: string;
       }[]
     | null;
+};
+
+export type OwnerTenantCandidateRecord = {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  created_at: string;
 };
 
 export type OwnerBillRecord = {
@@ -96,6 +106,7 @@ export type OwnerPaymentRecord = {
   amount: number;
   method: string;
   proof_path: string | null;
+  proof_url?: string | null;
   note: string | null;
   verification_status: "pending" | "approved" | "rejected";
   bills:
@@ -280,6 +291,25 @@ function getPaymentRoomName(payment: OwnerPaymentRecord) {
   return bill?.rooms?.name ?? "-";
 }
 
+async function getPaymentProofSignedUrl(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  proofPath: string | null
+) {
+  if (!proofPath) {
+    return null;
+  }
+
+  const { data, error } = await supabase.storage
+    .from("payment-proofs")
+    .createSignedUrl(proofPath, 60 * 10);
+
+  if (error) {
+    return null;
+  }
+
+  return data.signedUrl;
+}
+
 function getReportTenantName(report: OwnerMaintenanceReportRecord) {
   if (Array.isArray(report.tenants)) {
     return report.tenants[0]?.full_name ?? "Tanpa penghuni";
@@ -336,6 +366,7 @@ function emptySupabaseTenants(sourceReason?: string): OwnerModuleData {
     source: "supabase",
     sourceReason,
     tenants: [],
+    tenantCandidates: [],
     metrics: [
       {
         label: "Aktif",
@@ -344,9 +375,9 @@ function emptySupabaseTenants(sourceReason?: string): OwnerModuleData {
         tone: "slate"
       },
       {
-        label: "Akan keluar",
+        label: "Belum pilih kamar",
         value: "0",
-        note: "Tidak ada",
+        note: "Tidak ada antrean",
         tone: "emerald"
       },
       {
@@ -816,7 +847,17 @@ export async function getOwnerPaymentsData(): Promise<OwnerModuleData> {
       );
     }
 
-    const payments = data as unknown as OwnerPaymentRecord[];
+    const payments = await Promise.all(
+      ((data ?? []) as unknown as OwnerPaymentRecord[]).map(
+        async (payment) => ({
+          ...payment,
+          proof_url: await getPaymentProofSignedUrl(
+            supabase,
+            payment.proof_path
+          )
+        })
+      )
+    );
     const approvedPayments = payments.filter(
       (payment) => payment.verification_status === "approved"
     );
@@ -889,13 +930,24 @@ export async function getOwnerTenantsData(): Promise<OwnerModuleData> {
     const {
       data: { user }
     } = await supabase.auth.getUser();
-    const { data, error } = await supabase
-      .from("tenants")
-      .select(
-        "id,property_id,room_id,full_name,email,phone,emergency_contact,move_in_date,rent_type,status,rooms(name)"
-      )
-      .order("full_name");
+    const [
+      { data: tenantsData, error: tenantsError },
+      { data: profilesData, error: profilesError }
+    ] = await Promise.all([
+      supabase
+        .from("tenants")
+        .select(
+          "id,profile_id,property_id,room_id,full_name,email,phone,emergency_contact,move_in_date,rent_type,status,rooms(name)"
+        )
+        .order("full_name"),
+      supabase
+        .from("profiles")
+        .select("id,full_name,email,phone,created_at")
+        .eq("role", "tenant")
+        .order("created_at", { ascending: false })
+    ]);
 
+    const error = tenantsError ?? profilesError;
     if (error) {
       return emptySupabaseTenants(
         `${error.message}; session=${
@@ -904,7 +956,24 @@ export async function getOwnerTenantsData(): Promise<OwnerModuleData> {
       );
     }
 
-    if (!data?.length) {
+    const tenants = (tenantsData ?? []) as unknown as OwnerTenantRecord[];
+    const linkedProfileIds = new Set(
+      tenants
+        .map((tenant) => tenant.profile_id)
+        .filter((profileId): profileId is string => Boolean(profileId))
+    );
+    const linkedEmails = new Set(
+      tenants.map((tenant) => tenant.email.trim().toLowerCase())
+    );
+    const tenantCandidates = (
+      (profilesData ?? []) as OwnerTenantCandidateRecord[]
+    ).filter(
+      (profile) =>
+        !linkedProfileIds.has(profile.id) &&
+        !linkedEmails.has(profile.email.trim().toLowerCase())
+    );
+
+    if (!tenants.length && !tenantCandidates.length) {
       return emptySupabaseTenants(
         `Belum ada penghuni di Supabase; session=${
           user?.email ?? "tidak ada"
@@ -912,11 +981,7 @@ export async function getOwnerTenantsData(): Promise<OwnerModuleData> {
       );
     }
 
-    const tenants = data as unknown as OwnerTenantRecord[];
     const active = tenants.filter((tenant) => tenant.status === "active").length;
-    const leaving = tenants.filter(
-      (tenant) => tenant.status === "leaving"
-    ).length;
     const monthly = tenants.filter(
       (tenant) => tenant.rent_type === "monthly"
     ).length;
@@ -927,6 +992,7 @@ export async function getOwnerTenantsData(): Promise<OwnerModuleData> {
     return {
       source: "supabase",
       tenants,
+      tenantCandidates,
       metrics: [
         {
           label: "Aktif",
@@ -935,10 +1001,10 @@ export async function getOwnerTenantsData(): Promise<OwnerModuleData> {
           tone: "emerald"
         },
         {
-          label: "Akan keluar",
-          value: `${leaving}`,
-          note: leaving ? "Perlu follow up" : "Tidak ada",
-          tone: leaving ? "amber" : "emerald"
+          label: "Belum pilih kamar",
+          value: `${tenantCandidates.length}`,
+          note: tenantCandidates.length ? "Menunggu pilihan tenant" : "Tidak ada antrean",
+          tone: tenantCandidates.length ? "amber" : "emerald"
         },
         {
           label: "Sewa bulanan",
