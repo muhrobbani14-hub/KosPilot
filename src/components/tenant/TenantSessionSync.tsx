@@ -59,7 +59,7 @@ export function TenantSessionSync({
     let isMounted = true;
 
     async function syncSession() {
-      const supabase = createClient();
+      const supabase = createClient("tenant");
       const {
         data: { session }
       } = await supabase.auth.getSession();

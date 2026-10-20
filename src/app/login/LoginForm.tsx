@@ -94,7 +94,7 @@ export function LoginForm() {
     setIsSubmitting(true);
 
     try {
-      const supabase = createClient();
+      const supabase = createClient(selectedRole);
       const { error: loginError } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -138,6 +138,27 @@ export function LoginForm() {
           : tenant
             ? "tenant"
           : selectedRole;
+      if (role !== selectedRole) {
+        const {
+          data: { session }
+        } = await supabase.auth.getSession();
+
+        if (!session) {
+          setError("Session login belum tersimpan. Coba login ulang.");
+          return;
+        }
+
+        const roleClient = createClient(role);
+        const { error: sessionError } = await roleClient.auth.setSession({
+          access_token: session.access_token,
+          refresh_token: session.refresh_token
+        });
+
+        if (sessionError) {
+          setError(`Session login gagal disiapkan: ${sessionError.message}`);
+          return;
+        }
+      }
       const nextPath = searchParams.get("next");
       const targetPath =
         nextPath && isAllowedNextPath(nextPath, role)

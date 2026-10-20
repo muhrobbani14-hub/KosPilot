@@ -1,9 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 import { getSupabaseConfig } from "@/lib/supabase/config";
+import {
+  getAuthCookieName,
+  isSupabaseAuthRole,
+  type SupabaseAuthRole
+} from "@/lib/supabase/session";
 
-export async function createClient() {
+export async function createClient(role?: SupabaseAuthRole) {
   const { url, anonKey } = getSupabaseConfig();
 
   if (!url || !anonKey) {
@@ -12,9 +17,19 @@ export async function createClient() {
     );
   }
 
-  const cookieStore = await cookies();
+  const requestHeaders = await headers();
+  const requestRole = requestHeaders.get("x-kospilot-auth-role");
+  const authRole = role ?? (isSupabaseAuthRole(requestRole) ? requestRole : null);
 
+  if (!authRole) {
+    throw new Error("Supabase auth role is missing from the request.");
+  }
+
+  const cookieStore = await cookies();
   return createServerClient(url, anonKey, {
+    cookieOptions: {
+      name: getAuthCookieName(authRole)
+    },
     cookies: {
       getAll() {
         return cookieStore.getAll();

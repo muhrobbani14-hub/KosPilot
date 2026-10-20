@@ -23,7 +23,7 @@ export function DashboardHeader({
   const [query, setQuery] = useState("");
 
   async function handleLogout() {
-    await signOutSafely();
+    await signOutSafely("owner");
     router.replace("/login");
     router.refresh();
   }

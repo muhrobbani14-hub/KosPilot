@@ -25,7 +25,7 @@ export function TenantShell({
   const router = useRouter();
 
   async function handleLogout() {
-    await signOutSafely();
+    await signOutSafely("tenant");
     router.replace("/login");
     router.refresh();
   }

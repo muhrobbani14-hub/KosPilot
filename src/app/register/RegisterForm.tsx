@@ -98,7 +98,7 @@ export function RegisterForm() {
     setIsSubmitting(true);
 
     try {
-      const supabase = createClient();
+      const supabase = createClient(role);
       const { data: signUpData, error: signUpError } =
         await supabase.auth.signUp({
           email: normalizedEmail,

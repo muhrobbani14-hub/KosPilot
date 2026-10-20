@@ -1,6 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import {
+  getAuthCookieName,
+  getAuthRoleFromPath
+} from "@/lib/supabase/session";
+
 const ownerRoutes = [
   "/dashboard",
   "/rooms",
@@ -66,11 +71,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  let response = NextResponse.next({
-    request
-  });
+  const authRole = getAuthRoleFromPath(pathname);
+  request.headers.set("x-kospilot-auth-role", authRole);
+  let response = NextResponse.next({ request });
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookieOptions: {
+      name: getAuthCookieName(authRole)
+    },
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -80,9 +88,7 @@ export async function middleware(request: NextRequest) {
           request.cookies.set(name, value);
         });
 
-        response = NextResponse.next({
-          request
-        });
+        response = NextResponse.next({ request });
 
         cookiesToSet.forEach(({ name, value, options }) => {
           response.cookies.set(name, value, options);
