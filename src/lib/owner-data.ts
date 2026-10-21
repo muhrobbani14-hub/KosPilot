@@ -185,6 +185,7 @@ export type OwnerMaintenanceReportRecord = {
   title: string;
   description: string;
   photo_path: string | null;
+  photo_url?: string | null;
   priority: "low" | "medium" | "high";
   status: "new" | "in_progress" | "done" | "rejected";
   owner_note: string | null;
@@ -302,6 +303,25 @@ async function getPaymentProofSignedUrl(
   const { data, error } = await supabase.storage
     .from("payment-proofs")
     .createSignedUrl(proofPath, 60 * 10);
+
+  if (error) {
+    return null;
+  }
+
+  return data.signedUrl;
+}
+
+async function getReportPhotoSignedUrl(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  photoPath: string | null
+) {
+  if (!photoPath) {
+    return null;
+  }
+
+  const { data, error } = await supabase.storage
+    .from("report-photos")
+    .createSignedUrl(photoPath, 60 * 10);
 
   if (error) {
     return null;
@@ -651,7 +671,14 @@ export async function getOwnerMaintenanceReportsData(): Promise<OwnerModuleData>
       );
     }
 
-    const maintenanceReports = data as unknown as OwnerMaintenanceReportRecord[];
+    const maintenanceReports = await Promise.all(
+      (data as unknown as OwnerMaintenanceReportRecord[]).map(
+        async (report) => ({
+          ...report,
+          photo_url: await getReportPhotoSignedUrl(supabase, report.photo_path)
+        })
+      )
+    );
     const activeReports = maintenanceReports.filter((report) =>
       ["new", "in_progress"].includes(report.status)
     );

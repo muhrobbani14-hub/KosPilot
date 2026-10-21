@@ -1,7 +1,12 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element -- Report photos use blob and private signed URLs. */
+
 import {
   AlertTriangle,
+  ExternalLink,
+  Eye,
+  FileText,
   Pencil,
   Plus,
   Search,
@@ -11,7 +16,7 @@ import {
   X
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import {
   createMaintenanceReportAction,
@@ -37,6 +42,13 @@ type MaintenanceReportsManagerProps = {
   metrics: Metric[];
   reports: OwnerMaintenanceReportRecord[];
   tenants: OwnerTenantRecord[];
+};
+
+type ReportPhotoPreview = {
+  label: string;
+  title: string;
+  url: string;
+  isLocal?: boolean;
 };
 
 const emptyFormValues: MaintenanceReportFormValues = {
@@ -127,6 +139,24 @@ function reportToFormValues(
   };
 }
 
+function getReportPhotoFileName(photoPath: string | null) {
+  return photoPath?.split("/").pop() ?? "Foto laporan";
+}
+
+function photoPreviewFromReport(
+  report: OwnerMaintenanceReportRecord
+): ReportPhotoPreview | null {
+  if (!report.photo_path) {
+    return null;
+  }
+
+  return {
+    label: getReportPhotoFileName(report.photo_path),
+    title: `Foto laporan ${report.title}`,
+    url: report.photo_url ?? ""
+  };
+}
+
 function getInitialFormValues(
   tenants: OwnerTenantRecord[]
 ): MaintenanceReportFormValues {
@@ -202,6 +232,10 @@ export function MaintenanceReportsManager({
   const [editingReport, setEditingReport] =
     useState<OwnerMaintenanceReportRecord | null>(null);
   const [photoFileName, setPhotoFileName] = useState("");
+  const [formPhotoPreview, setFormPhotoPreview] =
+    useState<ReportPhotoPreview | null>(null);
+  const [photoPreview, setPhotoPreview] =
+    useState<ReportPhotoPreview | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -213,18 +247,30 @@ export function MaintenanceReportsManager({
     }));
   const visibleMetrics = createVisibleMetrics(visibleReports);
 
+  useEffect(() => {
+    return () => {
+      if (formPhotoPreview?.isLocal && formPhotoPreview.url) {
+        URL.revokeObjectURL(formPhotoPreview.url);
+      }
+    };
+  }, [formPhotoPreview]);
+
   function openCreateForm() {
     setEditingReport(null);
     setFormValues(getInitialFormValues(tenants));
     setPhotoFileName("");
+    setFormPhotoPreview(null);
     setError("");
     setIsFormOpen(true);
   }
 
   function openEditForm(report: OwnerMaintenanceReportRecord) {
+    const preview = photoPreviewFromReport(report);
+
     setEditingReport(report);
     setFormValues(reportToFormValues(report));
-    setPhotoFileName(report.photo_path ?? "");
+    setPhotoFileName(preview?.label ?? "");
+    setFormPhotoPreview(preview);
     setError("");
     setIsFormOpen(true);
   }
@@ -233,6 +279,7 @@ export function MaintenanceReportsManager({
     setEditingReport(null);
     setFormValues(emptyFormValues);
     setPhotoFileName("");
+    setFormPhotoPreview(null);
     setError("");
     setIsFormOpen(false);
   }
@@ -306,6 +353,15 @@ export function MaintenanceReportsManager({
     setError("");
     setMessage("");
     setIsUploading(true);
+    const nextPreviewUrl = URL.createObjectURL(file);
+
+    setPhotoFileName(file.name);
+    setFormPhotoPreview({
+      label: file.name,
+      title: "Preview foto laporan",
+      url: nextPreviewUrl,
+      isLocal: true
+    });
 
     try {
       const path = await uploadAppFile({
@@ -327,6 +383,9 @@ export function MaintenanceReportsManager({
           ? uploadError.message
           : "Gagal upload foto laporan."
       );
+      setPhotoFileName("");
+      setFormPhotoPreview(null);
+      URL.revokeObjectURL(nextPreviewUrl);
     } finally {
       setIsUploading(false);
     }
@@ -421,7 +480,7 @@ export function MaintenanceReportsManager({
           <div className="mt-5 space-y-3">
             {visibleReports.map((report) => (
               <article
-                className="grid min-w-0 gap-3 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm md:grid-cols-[minmax(0,1fr)_auto_auto_auto]"
+                className="grid min-w-0 gap-3 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm md:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto]"
                 key={report.id}
               >
                 <div className="flex min-w-0 items-start gap-3">
@@ -437,6 +496,30 @@ export function MaintenanceReportsManager({
                     </p>
                   </div>
                 </div>
+                {report.photo_path ? (
+                  <button
+                    className="inline-flex min-w-0 items-center gap-2 justify-self-start rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 transition hover:border-[#2a6b5c]/40 hover:text-[#2a6b5c] md:self-center"
+                    onClick={() =>
+                      setPhotoPreview(photoPreviewFromReport(report))
+                    }
+                    type="button"
+                  >
+                    {report.photo_url ? (
+                      <img
+                        alt=""
+                        className="size-8 rounded-xl object-cover"
+                        src={report.photo_url}
+                      />
+                    ) : (
+                      <FileText className="shrink-0" size={16} />
+                    )}
+                    <span className="max-w-28 truncate">Lihat foto</span>
+                  </button>
+                ) : (
+                  <span className="inline-flex justify-self-start rounded-2xl bg-slate-50 px-3 py-2 text-xs font-black text-slate-400 md:self-center">
+                    Tanpa foto
+                  </span>
+                )}
                 <span
                   className={`inline-flex max-w-full justify-self-start rounded-full px-3 py-1.5 text-xs font-black md:self-center ${priorityClasses[report.priority]}`}
                 >
@@ -481,6 +564,67 @@ export function MaintenanceReportsManager({
           </div>
         )}
       </section>
+
+      {photoPreview ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4">
+          <section className="max-h-[calc(100vh-32px)] w-full max-w-4xl overflow-y-auto rounded-[28px] border border-white/70 bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-[#2a6b5c]">
+                  Preview foto laporan
+                </p>
+                <h2 className="mt-1 break-words text-2xl font-black text-slate-950">
+                  {photoPreview.title}
+                </h2>
+                <p className="mt-1 break-words text-sm text-slate-500">
+                  {photoPreview.label}
+                </p>
+              </div>
+              <button
+                aria-label="Tutup preview foto laporan"
+                className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
+                onClick={() => setPhotoPreview(null)}
+                type="button"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="mt-5 overflow-hidden rounded-[24px] border border-slate-100 bg-slate-50">
+              {photoPreview.url ? (
+                <img
+                  alt={photoPreview.title}
+                  className="max-h-[70vh] w-full object-contain"
+                  src={photoPreview.url}
+                />
+              ) : (
+                <div className="p-8 text-center">
+                  <FileText className="mx-auto text-[#2a6b5c]" size={36} />
+                  <h3 className="mt-3 text-xl font-black text-slate-950">
+                    Preview belum tersedia
+                  </h3>
+                  <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+                    Foto tersimpan, tetapi tautan preview belum tersedia.
+                    Periksa akses Storage untuk bucket report-photos.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {photoPreview.url ? (
+              <a
+                className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-700 transition hover:border-[#2a6b5c]/40 hover:text-[#2a6b5c]"
+                href={photoPreview.url}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Buka di tab baru
+                <ExternalLink size={16} />
+              </a>
+            ) : null}
+          </section>
+        </div>
+      ) : null}
 
       {isFormOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
@@ -612,6 +756,37 @@ export function MaintenanceReportsManager({
                   type="file"
                 />
               </label>
+              {formPhotoPreview ? (
+                <div className="rounded-[28px] border border-slate-100 bg-white p-4 sm:col-span-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-black text-slate-950">
+                      Preview foto
+                    </p>
+                    {formPhotoPreview.url ? (
+                      <button
+                        className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-600 transition hover:border-[#2a6b5c]/40 hover:text-[#2a6b5c]"
+                        onClick={() => setPhotoPreview(formPhotoPreview)}
+                        type="button"
+                      >
+                        <Eye size={15} />
+                        Lihat besar
+                      </button>
+                    ) : null}
+                  </div>
+                  {formPhotoPreview.url ? (
+                    <img
+                      alt={`Preview ${formPhotoPreview.label}`}
+                      className="mt-3 max-h-80 w-full rounded-2xl border border-slate-100 object-contain"
+                      src={formPhotoPreview.url}
+                    />
+                  ) : (
+                    <p className="mt-3 text-sm text-slate-500">
+                      Foto tersimpan, tetapi preview belum tersedia. Periksa
+                      akses Storage untuk bucket report-photos.
+                    </p>
+                  )}
+                </div>
+              ) : null}
               <label className="block sm:col-span-2">
                 <span className="text-sm font-bold text-slate-700">
                   Catatan pemilik
