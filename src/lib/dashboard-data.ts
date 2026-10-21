@@ -1,5 +1,11 @@
 import { compareNaturalText, getSummary } from "@/lib/dashboard";
-import type { Bill, Repair, Room, Summary } from "@/lib/dashboard";
+import type {
+  Bill,
+  OperationalHealth,
+  Repair,
+  Room,
+  Summary
+} from "@/lib/dashboard";
 import { hasSupabaseConfig } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 
@@ -15,6 +21,7 @@ export type DashboardOverviewData = {
   repairs: Repair[];
   activities: string[];
   summary: Summary;
+  operationalHealth: OperationalHealth;
   cashflow: {
     income: number;
     expenses: number;
@@ -114,6 +121,10 @@ function emptySupabaseDashboardData(sourceReason?: string): DashboardOverviewDat
     repairs: [],
     activities: ["Belum ada aktivitas prioritas."],
     summary: getSummary([]),
+    operationalHealth: {
+      pendingPayments: 0,
+      activeRepairs: 0
+    },
     cashflow: {
       income: 0,
       expenses: 0,
@@ -220,6 +231,8 @@ export async function getDashboardOverviewData(): Promise<DashboardOverviewData>
       { data: paymentsData, error: paymentsError },
       { data: expensesData, error: expensesError },
       { data: repairsData, error: repairsError },
+      { count: pendingPaymentsCount, error: pendingPaymentsError },
+      { count: activeRepairsCount, error: activeRepairsCountError },
       { data: activityLogsData }
     ] = await Promise.all([
       supabase
@@ -262,6 +275,14 @@ export async function getDashboardOverviewData(): Promise<DashboardOverviewData>
         .order("created_at", { ascending: false })
         .limit(4),
       supabase
+        .from("payments")
+        .select("id", { count: "exact", head: true })
+        .eq("verification_status", "pending"),
+      supabase
+        .from("maintenance_reports")
+        .select("id", { count: "exact", head: true })
+        .in("status", ["new", "in_progress"]),
+      supabase
         .from("activity_logs")
         .select("action,created_at")
         .order("created_at", { ascending: false })
@@ -273,7 +294,9 @@ export async function getDashboardOverviewData(): Promise<DashboardOverviewData>
       billsError ??
       paymentsError ??
       expensesError ??
-      repairsError;
+      repairsError ??
+      pendingPaymentsError ??
+      activeRepairsCountError;
 
     if (firstError) {
       return emptySupabaseDashboardData(firstError.message);
@@ -371,6 +394,10 @@ export async function getDashboardOverviewData(): Promise<DashboardOverviewData>
         ? activities
         : ["Belum ada aktivitas prioritas."],
       summary,
+      operationalHealth: {
+        pendingPayments: pendingPaymentsCount ?? 0,
+        activeRepairs: activeRepairsCount ?? 0
+      },
       cashflow: {
         income,
         expenses,

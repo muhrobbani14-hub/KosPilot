@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
 import { Sidebar } from "@/components/dashboard/Sidebar";
+import type { OperationalHealth } from "@/lib/dashboard";
 import { hasSupabaseConfig } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/client";
 
@@ -17,6 +18,7 @@ export type DashboardShellBrand = {
 type DashboardShellProps = {
   children: ReactNode;
   brand?: DashboardShellBrand;
+  operationalHealth?: OperationalHealth;
   preferBrand?: boolean;
   isSidebarOpen: boolean;
   onCloseSidebar: () => void;
@@ -33,6 +35,7 @@ function normalizeBrand(brand?: DashboardShellBrand): Required<DashboardShellBra
 export function DashboardShell({
   brand,
   children,
+  operationalHealth,
   isSidebarOpen,
   onCloseSidebar,
   onOpenSidebar,
@@ -100,6 +103,7 @@ export function DashboardShell({
       <div className="mx-auto flex max-w-[1500px] gap-4">
         <Sidebar
           brand={shellBrand}
+          operationalHealth={operationalHealth}
           isOpen={isSidebarOpen}
           onClose={onCloseSidebar}
         />

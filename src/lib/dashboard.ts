@@ -51,6 +51,11 @@ export type Summary = {
   totalRooms: number;
 };
 
+export type OperationalHealth = {
+  pendingPayments: number;
+  activeRepairs: number;
+};
+
 export const navigationItems: NavigationItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: Home },
   { label: "Kamar", href: "/rooms", icon: DoorOpen },

@@ -5,15 +5,22 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { navigationItems } from "@/lib/dashboard";
+import type { OperationalHealth } from "@/lib/dashboard";
 import type { DashboardShellBrand } from "@/components/dashboard/DashboardShell";
 
 type SidebarProps = {
   brand: Required<DashboardShellBrand>;
+  operationalHealth?: OperationalHealth;
   isOpen: boolean;
   onClose: () => void;
 };
 
-export function Sidebar({ brand, isOpen, onClose }: SidebarProps) {
+export function Sidebar({
+  brand,
+  operationalHealth,
+  isOpen,
+  onClose
+}: SidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -65,16 +72,21 @@ export function Sidebar({ brand, isOpen, onClose }: SidebarProps) {
         })}
       </nav>
 
-      <div className="mt-8 rounded-3xl bg-white/10 p-4">
-        <p className="text-sm font-bold">Kesehatan kos</p>
-        <div className="mt-4 h-2 rounded-full bg-white/10">
-          <div className="h-2 w-[82%] rounded-full bg-[#d9f99d]" />
+      {operationalHealth ? (
+        <div className="mt-8 rounded-3xl bg-white/10 p-4">
+          <p className="text-sm font-bold">Kondisi {brand.propertyName}</p>
+          {operationalHealth.pendingPayments || operationalHealth.activeRepairs ? (
+            <p className="mt-3 text-xs leading-5 text-white/60">
+              {operationalHealth.pendingPayments} pembayaran menunggu verifikasi
+              dan {operationalHealth.activeRepairs} laporan kerusakan aktif.
+            </p>
+          ) : (
+            <p className="mt-3 text-xs leading-5 text-white/60">
+              Tidak ada pembayaran menunggu verifikasi atau laporan kerusakan aktif.
+            </p>
+          )}
         </div>
-        <p className="mt-3 text-xs leading-5 text-white/60">
-          82% kondisi operasional aman. Fokus hari ini: verifikasi 1 pembayaran
-          dan cek 2 laporan.
-        </p>
-      </div>
+      ) : null}
     </aside>
   );
 }

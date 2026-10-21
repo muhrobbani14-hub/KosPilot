@@ -51,12 +51,17 @@ export function DashboardOverview({ data }: DashboardOverviewProps) {
   return (
     <DashboardShell
       brand={data.brand}
+      operationalHealth={data.operationalHealth}
       isSidebarOpen={sidebarOpen}
       onCloseSidebar={() => setSidebarOpen(false)}
       onOpenSidebar={() => setSidebarOpen(true)}
     >
       <section className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
-        <HeroStatus summary={data.summary} />
+        <HeroStatus
+          operationalHealth={data.operationalHealth}
+          propertyName={data.brand.propertyName}
+          summary={data.summary}
+        />
         <CashflowPanel
           expenses={data.cashflow.expenses}
           income={data.cashflow.income}

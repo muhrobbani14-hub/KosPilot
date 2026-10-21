@@ -10,17 +10,26 @@ import Link from "next/link";
 
 import { StatCard } from "@/components/dashboard/StatCard";
 import { formatMoney } from "@/lib/dashboard";
-import type { Summary } from "@/lib/dashboard";
+import type { OperationalHealth, Summary } from "@/lib/dashboard";
 
 type HeroStatusProps = {
+  propertyName: string;
   summary: Summary;
+  operationalHealth: OperationalHealth;
 };
 
-export function HeroStatus({ summary }: HeroStatusProps) {
+export function HeroStatus({
+  propertyName,
+  summary,
+  operationalHealth
+}: HeroStatusProps) {
   const hasRooms = summary.totalRooms > 0;
   const headline = hasRooms
-    ? `Kos Melati punya ${summary.occupied} kamar terisi dan ${summary.unpaid} tagihan perlu dicek.`
-    : "Dashboard siap dipakai untuk mengelola kos pertama.";
+    ? `${propertyName}: ${summary.occupied} dari ${summary.totalRooms} kamar terisi.`
+    : `${propertyName} belum memiliki data kamar.`;
+  const description = hasRooms
+    ? `${summary.vacant} kamar kosong, ${summary.unpaid} kamar memiliki tagihan belum lunas, ${operationalHealth.pendingPayments} pembayaran menunggu verifikasi, dan ${operationalHealth.activeRepairs} laporan kerusakan aktif.`
+    : "Tambahkan kamar untuk mulai memantau kondisi dan aktivitas kos.";
   const stats = [
     {
       label: "Pemasukan bulan ini",
@@ -58,14 +67,13 @@ export function HeroStatus({ summary }: HeroStatusProps) {
         <div>
           <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-[#d9f99d]">
             <Sparkles size={14} />
-            Kos aktif utama
+            Ringkasan {propertyName}
           </div>
           <h2 className="mt-4 max-w-2xl text-3xl font-black leading-tight tracking-tight md:text-4xl xl:text-5xl">
             {headline}
           </h2>
           <p className="mt-4 max-w-2xl text-sm leading-6 text-white/65 md:text-base">
-            Ringkasan ini membantu kamu tahu kondisi kos tanpa membuka semua
-            menu satu per satu.
+            {description}
           </p>
         </div>
         <Link
